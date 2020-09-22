@@ -25,7 +25,6 @@ import (
 	"github.com/kkdai/youtube/v2"
 	. "github.com/smartystreets/goconvey/convey"
 	"github.com/spf13/pflag"
-	flag "github.com/spf13/pflag"
 )
 
 type mockFile struct{}
@@ -38,6 +37,19 @@ func (myFile mockFile) Mode() os.FileMode  { return 0 }
 func (myFile mockFile) ModTime() time.Time { return time.Now() }
 func (myFile mockFile) IsDir() bool        { return false }
 func (myFile mockFile) Sys() interface{}   { return nil }
+
+var (
+	ErrOSRemoveError      = errors.New("OSRemoveError")
+	ErrKeyboardOpenFail   = errors.New("KeyboardOpenFail")
+	ErrKeyboardGetKeyFail = errors.New("KeyboardGetKeyFail")
+	ErrOSCreateError      = errors.New("OSCreateError")
+	ErrNewRequestError    = errors.New("NewRequestError")
+	ErrJSONUnmarshalError = errors.New("JSONUnmarshalError")
+	ErrIOUtilReadAllError = errors.New("IOUtilReadAllError")
+	ErrOpenTagFail        = errors.New("OpenTagFail")
+	ErrIOUtilReadDirError = errors.New("IOUtilReadDirError")
+	ErrIOCopyError        = errors.New("IOCopyError")
+)
 
 func TestProgressBar(t *testing.T) {
 	Convey("uiProgressWriter", t, func() {
@@ -64,7 +76,7 @@ func TestDeletFileNotInList(t *testing.T) {
 			myPatches := NewPatches()
 			defer myPatches.Reset()
 
-			myPatches.ApplyFunc(os.Remove, func(string) error { return errors.New("OSRemoveError") })
+			myPatches.ApplyFunc(os.Remove, func(string) error { return ErrOSRemoveError })
 
 			var myBuffer bytes.Buffer
 			color.SetOutput(io.Writer(&myBuffer))
@@ -111,7 +123,7 @@ func TestDeletFileNotInList(t *testing.T) {
 			defer myPatches.Reset()
 
 			myPatches.ApplyFunc(os.Remove, func(string) error { return nil })
-			myPatches.ApplyFunc(keyboard.Open, func() error { return errors.New("KeyboardOpenFail") })
+			myPatches.ApplyFunc(keyboard.Open, func() error { return ErrKeyboardOpenFail })
 
 			var myBuffer bytes.Buffer
 			color.SetOutput(io.Writer(&myBuffer))
@@ -136,7 +148,7 @@ func TestDeletFileNotInList(t *testing.T) {
 
 			myPatches.ApplyFunc(os.Remove, func(string) error { return nil })
 			myPatches.ApplyFunc(keyboard.Open, func() error { return nil })
-			myPatches.ApplyFunc(keyboard.GetKey, func() (rune, keyboard.Key, error) { return 0, 0, errors.New("KeyboardGetKeyFail") })
+			myPatches.ApplyFunc(keyboard.GetKey, func() (rune, keyboard.Key, error) { return 0, 0, ErrKeyboardGetKeyFail })
 
 			var myBuffer bytes.Buffer
 			color.SetOutput(io.Writer(&myBuffer))
@@ -162,6 +174,7 @@ func TestDeletFileNotInList(t *testing.T) {
 
 			myPatches.ApplyFunc(os.Remove, func(string) error {
 				actualRemove = true
+
 				return nil
 			})
 			myPatches.ApplyFunc(keyboard.Open, func() error { return nil })
@@ -196,10 +209,11 @@ func TestConvert(t *testing.T) {
 			})
 			myPatches.ApplyMethod(reflect.TypeOf(myCmd), "Start", func(*exec.Cmd) error { return nil })
 			myPatches.ApplyFunc(id3v2.Open, func(name string, opts id3v2.Options) (*id3v2.Tag, error) { return myTag, nil })
-			myPatches.ApplyMethod(reflect.TypeOf(myTag), "AddTextFrame", func(tag *id3v2.Tag, id string, encoding id3v2.Encoding, text string) {
-				So(id, ShouldEqual, "TPUB")
-				So(text, ShouldEqual, "123")
-			})
+			myPatches.ApplyMethod(reflect.TypeOf(myTag), "AddTextFrame",
+				func(tag *id3v2.Tag, id string, encoding id3v2.Encoding, text string) {
+					So(id, ShouldEqual, "TPUB")
+					So(text, ShouldEqual, "123")
+				})
 			myPatches.ApplyMethod(reflect.TypeOf(myTag), "Save", func(*id3v2.Tag) error { return nil })
 
 			convert(&mp4FileName, &mp3FileName, &myID, nil)
@@ -234,7 +248,6 @@ func TestConvert(t *testing.T) {
 func TestDownload(t *testing.T) {
 	Convey("Download", t, func() {
 		Convey("GetVideoError_ShouldPrint", func() {
-
 			var myBuffer bytes.Buffer
 			color.SetOutput(io.Writer(&myBuffer))
 			defer color.SetOutput(os.Stdout)
@@ -257,6 +270,7 @@ func TestDownload(t *testing.T) {
 				myVideo := &youtube.Video{
 					Formats: []youtube.Format{*myFormat},
 				}
+
 				return myVideo, nil
 			})
 
@@ -282,16 +296,19 @@ func TestDownload(t *testing.T) {
 				myVideo := &youtube.Video{
 					Formats: []youtube.Format{*myFormat},
 				}
+
 				return myVideo, nil
 			})
-			myPatches.ApplyMethod(reflect.TypeOf(myClinet), "GetStream", func(*youtube.Client, *youtube.Video, *youtube.Format) (*http.Response, error) {
-				myResponse := &http.Response{}
-				myResponse.Body = ioutil.NopCloser(strings.NewReader(""))
-				return myResponse, nil
-			})
-			myPatches.ApplyFunc(os.Create, func(name string) (*os.File, error) {
-				return nil, errors.New("OSCreateError")
-			})
+			myPatches.ApplyMethod(
+				reflect.TypeOf(myClinet),
+				"GetStream",
+				func(*youtube.Client, *youtube.Video, *youtube.Format) (*http.Response, error) {
+					myResponse := &http.Response{}
+					myResponse.Body = ioutil.NopCloser(strings.NewReader(""))
+
+					return myResponse, nil
+				})
+			myPatches.ApplyFunc(os.Create, func(name string) (*os.File, error) { return nil, ErrOSCreateError })
 
 			var myBuffer bytes.Buffer
 			color.SetOutput(io.Writer(&myBuffer))
@@ -315,17 +332,19 @@ func TestDownload(t *testing.T) {
 				myVideo := &youtube.Video{
 					Formats: []youtube.Format{*myFormat},
 				}
+
 				return myVideo, nil
 			})
-			myPatches.ApplyMethod(reflect.TypeOf(myClinet), "GetStream", func(*youtube.Client, *youtube.Video, *youtube.Format) (*http.Response, error) {
-				myResponse := &http.Response{}
-				myResponse.Body = ioutil.NopCloser(strings.NewReader(""))
-				return myResponse, nil
-			})
+			myPatches.ApplyMethod(reflect.TypeOf(myClinet), "GetStream",
+				func(*youtube.Client, *youtube.Video, *youtube.Format) (*http.Response, error) {
+					myResponse := &http.Response{}
+					myResponse.Body = ioutil.NopCloser(strings.NewReader(""))
+
+					return myResponse, nil
+				})
 			myPatches.ApplyFunc(os.Create, func(name string) (*os.File, error) { return nil, nil })
-			myPatches.ApplyFunc(io.Copy, func(dst io.Writer, src io.Reader) (written int64, err error) {
-				return 0, errors.New("IOCopyError")
-			})
+			myPatches.ApplyFunc(io.Copy,
+				func(dst io.Writer, src io.Reader) (written int64, err error) { return 0, ErrIOCopyError })
 
 			var myBuffer bytes.Buffer
 			color.SetOutput(io.Writer(&myBuffer))
@@ -350,20 +369,21 @@ func TestDownload(t *testing.T) {
 				myVideo := &youtube.Video{
 					Formats: []youtube.Format{*myFormat},
 				}
+
 				return myVideo, nil
 			})
-			myPatches.ApplyMethod(reflect.TypeOf(myClinet), "GetStream", func(*youtube.Client, *youtube.Video, *youtube.Format) (*http.Response, error) {
-				myResponse := &http.Response{}
-				myResponse.Body = ioutil.NopCloser(strings.NewReader(""))
-				return myResponse, nil
-			})
+			myPatches.ApplyMethod(reflect.TypeOf(myClinet), "GetStream",
+				func(*youtube.Client, *youtube.Video, *youtube.Format) (*http.Response, error) {
+					myResponse := &http.Response{}
+					myResponse.Body = ioutil.NopCloser(strings.NewReader(""))
+
+					return myResponse, nil
+				})
 			myPatches.ApplyMethod(reflect.TypeOf(myFile), "Close", func(*os.File) error { return nil })
-			myPatches.ApplyFunc(os.Create, func(name string) (*os.File, error) {
-				return myFile, nil
-			})
+			myPatches.ApplyFunc(os.Create, func(name string) (*os.File, error) { return myFile, nil })
 			myPatches.ApplyFunc(io.Copy, func(dst io.Writer, src io.Reader) (written int64, err error) { return 0, nil })
 			myPatches.ApplyFunc(convert, func(*string, *string, *string, *uiprogress.Bar) {})
-			myPatches.ApplyFunc(os.Remove, func(string) error { return errors.New("OSRemoveError") })
+			myPatches.ApplyFunc(os.Remove, func(string) error { return ErrOSRemoveError })
 
 			var myBuffer bytes.Buffer
 			color.SetOutput(io.Writer(&myBuffer))
@@ -384,28 +404,32 @@ func TestDownload(t *testing.T) {
 			myPatches := NewPatches()
 			defer myPatches.Reset()
 
-			myPatches.ApplyMethod(reflect.TypeOf(myClinet), "GetVideo", func(*youtube.Client, string) (*youtube.Video, error) {
-				myFormat := &youtube.Format{}
-				myVideo := &youtube.Video{
-					Formats: []youtube.Format{*myFormat},
-				}
-				return myVideo, nil
-			})
-			myPatches.ApplyMethod(reflect.TypeOf(myClinet), "GetStream", func(*youtube.Client, *youtube.Video, *youtube.Format) (*http.Response, error) {
-				myResponse := &http.Response{}
-				myResponse.ContentLength = 100
-				myResponse.Body = ioutil.NopCloser(strings.NewReader(""))
-				return myResponse, nil
-			})
+			myPatches.ApplyMethod(reflect.TypeOf(myClinet), "GetVideo",
+				func(*youtube.Client, string) (*youtube.Video, error) {
+					myFormat := &youtube.Format{}
+					myVideo := &youtube.Video{
+						Formats: []youtube.Format{*myFormat},
+					}
+
+					return myVideo, nil
+				})
+			myPatches.ApplyMethod(reflect.TypeOf(myClinet), "GetStream",
+				func(*youtube.Client, *youtube.Video, *youtube.Format) (*http.Response, error) {
+					myResponse := &http.Response{}
+					myResponse.ContentLength = 100
+					myResponse.Body = ioutil.NopCloser(strings.NewReader(""))
+
+					return myResponse, nil
+				})
 			myPatches.ApplyMethod(reflect.TypeOf(myFile), "Close", func(*os.File) error {
 				So(string(ProgressBar.Bytes()), ShouldContainSubstring, "Downloading")
+
 				return nil
 			})
-			myPatches.ApplyFunc(os.Create, func(name string) (*os.File, error) {
-				return myFile, nil
-			})
+			myPatches.ApplyFunc(os.Create, func(name string) (*os.File, error) { return myFile, nil })
 			myPatches.ApplyFunc(io.TeeReader, func(r io.Reader, w io.Writer) io.Reader {
 				ProgressBar = (w.(uiProgressWriter)).ProgressBar
+
 				return nil
 			})
 			myPatches.ApplyFunc(io.Copy, func(dst io.Writer, src io.Reader) (written int64, err error) { return 0, nil })
@@ -431,19 +455,16 @@ func TestGetFiles(t *testing.T) {
 			myPatches := NewPatches()
 			defer myPatches.Reset()
 
-			myPatches.ApplyFunc(os.Stat, func(name string) (os.FileInfo, error) {
-				return nil, os.ErrNotExist
-			})
+			myPatches.ApplyFunc(os.Stat, func(name string) (os.FileInfo, error) { return nil, os.ErrNotExist })
 
 			myPatches.ApplyFunc(os.Mkdir, func(name string, perm os.FileMode) error {
 				actualCalled = true
 				So(name, ShouldEqual, "MyPath")
+
 				return nil
 			})
 
-			myPatches.ApplyFunc(ioutil.ReadDir, func(dirname string) ([]os.FileInfo, error) {
-				return nil, nil
-			})
+			myPatches.ApplyFunc(ioutil.ReadDir, func(dirname string) ([]os.FileInfo, error) { return nil, nil })
 
 			getFiles("MyPath")
 
@@ -454,13 +475,9 @@ func TestGetFiles(t *testing.T) {
 			myPatches := NewPatches()
 			defer myPatches.Reset()
 
-			myPatches.ApplyFunc(os.Stat, func(name string) (os.FileInfo, error) {
-				return nil, nil
-			})
-
-			myPatches.ApplyFunc(ioutil.ReadDir, func(dirname string) ([]os.FileInfo, error) {
-				return nil, errors.New("IOUtilReadDirError")
-			})
+			myPatches.ApplyFunc(os.Stat, func(name string) (os.FileInfo, error) { return nil, nil })
+			myPatches.ApplyFunc(ioutil.ReadDir,
+				func(dirname string) ([]os.FileInfo, error) { return nil, ErrIOUtilReadDirError })
 
 			var myBuffer bytes.Buffer
 			color.SetOutput(io.Writer(&myBuffer))
@@ -475,15 +492,10 @@ func TestGetFiles(t *testing.T) {
 			myPatches := NewPatches()
 			defer myPatches.Reset()
 
-			myPatches.ApplyFunc(os.Stat, func(name string) (os.FileInfo, error) {
-				return nil, nil
-			})
-
 			myFiles := []os.FileInfo{}
 
-			myPatches.ApplyFunc(ioutil.ReadDir, func(dirname string) ([]os.FileInfo, error) {
-				return myFiles, nil
-			})
+			myPatches.ApplyFunc(os.Stat, func(name string) (os.FileInfo, error) { return nil, nil })
+			myPatches.ApplyFunc(ioutil.ReadDir, func(dirname string) ([]os.FileInfo, error) { return myFiles, nil })
 
 			myResult := getFiles("MyPath")
 
@@ -499,7 +511,9 @@ func TestGetPlayList(t *testing.T) {
 			defer myPatches.Reset()
 
 			myPatches.ApplyFunc(http.NewRequest, func(method, url string, body io.Reader) (*http.Request, error) {
-				return nil, errors.New("NewRequestError")
+				myRequest, _ := http.NewRequestWithContext(context.Background(), method, url, nil)
+
+				return myRequest, ErrNewRequestError
 			})
 
 			var myBuffer bytes.Buffer
@@ -512,15 +526,16 @@ func TestGetPlayList(t *testing.T) {
 		})
 
 		Convey("DoRequestError_ShouldPrint", func() {
-
 			myPatches := NewPatches()
 			defer myPatches.Reset()
 
-			myTestServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { w.WriteHeader(200) }))
+			myTestServer := httptest.NewServer(http.HandlerFunc(
+				func(w http.ResponseWriter, r *http.Request) { w.WriteHeader(200) }))
 
 			myPatches.ApplyFunc(http.NewRequest, func(method, url string, body io.Reader) (*http.Request, error) {
 				myRequest, _ := http.NewRequestWithContext(context.Background(), method, myTestServer.URL, nil)
 				myRequest.URL = nil
+
 				return myRequest, nil
 			})
 
@@ -534,17 +549,18 @@ func TestGetPlayList(t *testing.T) {
 		})
 
 		Convey("IOUtilReadAllError_ShouldPrint", func() {
-
 			myPatches := NewPatches()
 			defer myPatches.Reset()
 
-			myTestServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { w.WriteHeader(200) }))
+			myTestServer := httptest.NewServer(http.HandlerFunc(
+				func(w http.ResponseWriter, r *http.Request) { w.WriteHeader(200) }))
 
 			myPatches.ApplyFunc(http.NewRequest, func(method, url string, body io.Reader) (*http.Request, error) {
 				return http.NewRequestWithContext(context.Background(), method, myTestServer.URL, nil)
 			})
 
-			myPatches.ApplyFunc(ioutil.ReadAll, func(r io.Reader) ([]byte, error) { return nil, errors.New("IOUtilReadAllError") })
+			myPatches.ApplyFunc(ioutil.ReadAll,
+				func(r io.Reader) ([]byte, error) { return nil, ErrIOUtilReadAllError })
 
 			var myBuffer bytes.Buffer
 			color.SetOutput(io.Writer(&myBuffer))
@@ -556,17 +572,18 @@ func TestGetPlayList(t *testing.T) {
 		})
 
 		Convey("JSONUnmarshalError_ShouldPrint", func() {
-
 			myPatches := NewPatches()
 			defer myPatches.Reset()
 
-			myTestServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { w.WriteHeader(200) }))
+			myTestServer := httptest.NewServer(http.HandlerFunc(
+				func(w http.ResponseWriter, r *http.Request) { w.WriteHeader(200) }))
 
 			myPatches.ApplyFunc(http.NewRequest, func(method, url string, body io.Reader) (*http.Request, error) {
 				return http.NewRequestWithContext(context.Background(), method, myTestServer.URL, nil)
 			})
 
-			myPatches.ApplyFunc(json.Unmarshal, func(data []byte, v interface{}) error { return errors.New("JSONUnmarshalError") })
+			myPatches.ApplyFunc(json.Unmarshal,
+				func(data []byte, v interface{}) error { return ErrJSONUnmarshalError })
 
 			var myBuffer bytes.Buffer
 			color.SetOutput(io.Writer(&myBuffer))
@@ -578,7 +595,6 @@ func TestGetPlayList(t *testing.T) {
 		})
 
 		Convey("AllRight_ShouldGetList", func() {
-
 			myPatches := NewPatches()
 			defer myPatches.Reset()
 
@@ -589,6 +605,7 @@ func TestGetPlayList(t *testing.T) {
 
 			myPatches.ApplyFunc(http.NewRequest, func(method, url string, body io.Reader) (*http.Request, error) {
 				So(url, ShouldEndWith, "456")
+
 				return http.NewRequestWithContext(context.Background(), method, myTestServer.URL, nil)
 			})
 
@@ -610,7 +627,8 @@ func TestHasID(t *testing.T) {
 			myPatches := NewPatches()
 			defer myPatches.Reset()
 
-			myPatches.ApplyFunc(id3v2.Open, func(name string, opts id3v2.Options) (*id3v2.Tag, error) { return nil, errors.New("") })
+			myPatches.ApplyFunc(id3v2.Open,
+				func(name string, opts id3v2.Options) (*id3v2.Tag, error) { return nil, ErrOpenTagFail })
 
 			So(hasID("1.mp3", ""), ShouldBeFalse)
 		})
@@ -624,6 +642,7 @@ func TestHasID(t *testing.T) {
 			myPatches.ApplyFunc(id3v2.Open, func(name string, opts id3v2.Options) (*id3v2.Tag, error) { return myTag, nil })
 			myPatches.ApplyMethod(reflect.TypeOf(myTag), "GetTextFrame", func(tag *id3v2.Tag, id string) id3v2.TextFrame {
 				So(id, ShouldEqual, "TPUB")
+
 				return id3v2.TextFrame{Text: "123"}
 			})
 
@@ -635,7 +654,6 @@ func TestHasID(t *testing.T) {
 func TestCheckFFMpeg(t *testing.T) {
 	Convey("CheckFFMpeg", t, func() {
 		Convey("FFMpegNotFound_ShouldPrint", func() {
-
 			myPatches := NewPatches()
 			defer myPatches.Reset()
 
@@ -652,7 +670,6 @@ func TestCheckFFMpeg(t *testing.T) {
 		})
 
 		Convey("Windows_ShouldPrintWindowsInfomation", func() {
-
 			myPatches := NewPatches()
 			defer myPatches.Reset()
 
@@ -670,7 +687,6 @@ func TestCheckFFMpeg(t *testing.T) {
 		})
 
 		Convey("MacOS_ShouldPrintMacOSInfomation", func() {
-
 			myPatches := NewPatches()
 			defer myPatches.Reset()
 
@@ -688,7 +704,6 @@ func TestCheckFFMpeg(t *testing.T) {
 		})
 
 		Convey("Linux_ShouldPrintLinuxInfomation", func() {
-
 			myPatches := NewPatches()
 			defer myPatches.Reset()
 
@@ -727,7 +742,6 @@ func TestParseFlag(t *testing.T) {
 			So(*isHelp, ShouldBeFalse)
 			So(*isSync, ShouldBeTrue)
 			So(*isNoConfirm, ShouldBeTrue)
-
 		})
 
 		Convey("NonePath_ShouldAssignID", func() {
@@ -741,14 +755,12 @@ func TestParseFlag(t *testing.T) {
 			_, _, syncPath, _, _ := parseFlag()
 
 			So(*syncPath, ShouldEqual, "123"+string(os.PathSeparator))
-
 		})
 	})
 }
 
 func TestMain(t *testing.T) {
 	Convey("Main", t, func() {
-
 		var myBuffer bytes.Buffer
 		color.SetOutput(io.Writer(&myBuffer))
 		defer color.SetOutput(os.Stdout)
@@ -759,11 +771,13 @@ func TestMain(t *testing.T) {
 			myPatches := NewPatches()
 			defer myPatches.Reset()
 
-			myPatches.ApplyFunc(parseFlag, func() (playListID int, isHelp *bool, syncPath *string, isSync *bool, isNoConfirm *bool) {
-				actualCalled = true
-				return
-			})
-			myPatches.ApplyFunc(flag.PrintDefaults, func() {})
+			myPatches.ApplyFunc(parseFlag,
+				func() (playListID int, isHelp *bool, syncPath *string, isSync *bool, isNoConfirm *bool) {
+					actualCalled = true
+
+					return
+				})
+			myPatches.ApplyFunc(pflag.PrintDefaults, func() {})
 			myPatches.ApplyFunc(os.Exit, func(code int) {})
 
 			main()
@@ -778,9 +792,8 @@ func TestMain(t *testing.T) {
 			myPatches := NewPatches()
 			defer myPatches.Reset()
 
-			myPatches.ApplyFunc(parseFlag, func() (playListID int, isHelp *bool, syncPath *string, isSync *bool, isNoConfirm *bool) {
-				return
-			})
+			myPatches.ApplyFunc(parseFlag,
+				func() (playListID int, isHelp *bool, syncPath *string, isSync *bool, isNoConfirm *bool) { return })
 
 			myPatches.ApplyFunc(printUsage, func() {
 				actualPrintUsageCalled = true
@@ -802,12 +815,14 @@ func TestMain(t *testing.T) {
 			myPatches := NewPatches()
 			defer myPatches.Reset()
 
-			myPatches.ApplyFunc(parseFlag, func() (playListID int, isHelp *bool, syncPath *string, isSync *bool, isNoConfirm *bool) {
-				playListID = 1
-				isHelp = new(bool)
-				*isHelp = false
-				return
-			})
+			myPatches.ApplyFunc(parseFlag,
+				func() (playListID int, isHelp *bool, syncPath *string, isSync *bool, isNoConfirm *bool) {
+					playListID = 1
+					isHelp = new(bool)
+					*isHelp = false
+
+					return
+				})
 
 			myPatches.ApplyFunc(checkFFMpeg, func() bool { return false })
 
@@ -827,16 +842,18 @@ func TestMain(t *testing.T) {
 			myPatches := NewPatches()
 			defer myPatches.Reset()
 
-			myPatches.ApplyFunc(parseFlag, func() (playListID int, isHelp *bool, syncPath *string, isSync *bool, isNoConfirm *bool) {
-				playListID = 1
-				isHelp = new(bool)
-				isSync = new(bool)
-				syncPath = new(string)
-				*isHelp = false
-				*isSync = false
-				*syncPath = ""
-				return
-			})
+			myPatches.ApplyFunc(parseFlag,
+				func() (playListID int, isHelp *bool, syncPath *string, isSync *bool, isNoConfirm *bool) {
+					playListID = 1
+					isHelp = new(bool)
+					isSync = new(bool)
+					syncPath = new(string)
+					*isHelp = false
+					*isSync = false
+					*syncPath = ""
+
+					return
+				})
 
 			myPatches.ApplyFunc(checkFFMpeg, func() bool { return true })
 
@@ -846,15 +863,15 @@ func TestMain(t *testing.T) {
 					{ID: ""},
 					{ID: expected},
 				}
+
 				return &myList
 			})
 
-			myPatches.ApplyFunc(getFiles, func(myPath string) *[]os.FileInfo {
-				return &[]os.FileInfo{&mockFile{}}
-			})
+			myPatches.ApplyFunc(getFiles, func(myPath string) *[]os.FileInfo { return &[]os.FileInfo{&mockFile{}} })
 
 			myPatches.ApplyFunc(hasID, func(myFile string, myID string) bool {
 				actualID = myID
+
 				return true
 			})
 
@@ -870,35 +887,37 @@ func TestMain(t *testing.T) {
 			myPatches := NewPatches()
 			defer myPatches.Reset()
 
-			myPatches.ApplyFunc(parseFlag, func() (playListID int, isHelp *bool, syncPath *string, isSync *bool, isNoConfirm *bool) {
-				playListID = 1
-				isHelp = new(bool)
-				isSync = new(bool)
-				syncPath = new(string)
-				*isHelp = false
-				*isSync = false
-				*syncPath = ""
-				return
-			})
+			myPatches.ApplyFunc(parseFlag,
+				func() (playListID int, isHelp *bool, syncPath *string, isSync *bool, isNoConfirm *bool) {
+					playListID = 1
+					isHelp = new(bool)
+					isSync = new(bool)
+					syncPath = new(string)
+					*isHelp = false
+					*isSync = false
+					*syncPath = ""
+
+					return
+				})
 
 			myPatches.ApplyFunc(checkFFMpeg, func() bool { return true })
 
 			myPatches.ApplyFunc(getPlayList, func(myID string) *playList {
 				myList := playList{}
 				myList.Vector.Items = []listItem{{ID: expected}}
+
 				return &myList
 			})
 
-			myPatches.ApplyFunc(getFiles, func(myPath string) *[]os.FileInfo {
-				return &[]os.FileInfo{&mockFile{}}
-			})
+			myPatches.ApplyFunc(getFiles, func(myPath string) *[]os.FileInfo { return &[]os.FileInfo{&mockFile{}} })
 
 			myPatches.ApplyFunc(hasID, func(myFile string, myID string) bool { return false })
 
-			myPatches.ApplyFunc(download, func(myID string, myPath string, myClient youtube.Client, myWaitGroup *sync.WaitGroup) {
-				actualID = myID
-				myWaitGroup.Done()
-			})
+			myPatches.ApplyFunc(download,
+				func(myID string, myPath string, myClient youtube.Client, myWaitGroup *sync.WaitGroup) {
+					actualID = myID
+					myWaitGroup.Done()
+				})
 
 			main()
 
@@ -911,22 +930,25 @@ func TestMain(t *testing.T) {
 			myPatches := NewPatches()
 			defer myPatches.Reset()
 
-			myPatches.ApplyFunc(parseFlag, func() (playListID int, isHelp *bool, syncPath *string, isSync *bool, isNoConfirm *bool) {
-				playListID = 1
-				isHelp = new(bool)
-				isSync = new(bool)
-				syncPath = new(string)
-				*isHelp = false
-				*isSync = true
-				*syncPath = ""
-				return
-			})
+			myPatches.ApplyFunc(parseFlag,
+				func() (playListID int, isHelp *bool, syncPath *string, isSync *bool, isNoConfirm *bool) {
+					playListID = 1
+					isHelp = new(bool)
+					isSync = new(bool)
+					syncPath = new(string)
+					*isHelp = false
+					*isSync = true
+					*syncPath = ""
+
+					return
+				})
 
 			myPatches.ApplyFunc(checkFFMpeg, func() bool { return true })
 
 			myPatches.ApplyFunc(getPlayList, func(myID string) *playList {
 				myList := playList{}
 				myList.Vector.Items = []listItem{}
+
 				return &myList
 			})
 
@@ -934,13 +956,15 @@ func TestMain(t *testing.T) {
 
 			myPatches.ApplyFunc(hasID, func(myFile string, myID string) bool { return false })
 
-			myPatches.ApplyFunc(download, func(myID string, myPath string, myClient youtube.Client, myWaitGroup *sync.WaitGroup) {
-				myWaitGroup.Done()
-			})
+			myPatches.ApplyFunc(download,
+				func(myID string, myPath string, myClient youtube.Client, myWaitGroup *sync.WaitGroup) {
+					myWaitGroup.Done()
+				})
 
-			myPatches.ApplyFunc(deletFileNotInList, func(myFiles *[]os.FileInfo, myList *playList, syncPath *string, isNoConfirm *bool) {
-				actualCalled = true
-			})
+			myPatches.ApplyFunc(deletFileNotInList,
+				func(myFiles *[]os.FileInfo, myList *playList, syncPath *string, isNoConfirm *bool) {
+					actualCalled = true
+				})
 
 			main()
 

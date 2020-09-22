@@ -2,6 +2,7 @@ package main
 
 import (
 	"bufio"
+	"context"
 	"encoding/json"
 	"io"
 	"io/ioutil"
@@ -24,8 +25,10 @@ import (
 	flag "github.com/spf13/pflag"
 )
 
-var ffmpeg = "" //= `C:\Program Files (x86)\Screen Capturer Recorder\configuration_setup_utility\vendor\ffmpeg\bin\ffmpeg`
-var runtimeGOOS = runtime.GOOS
+var (
+	ffmpeg      = ""
+	runtimeGOOS = runtime.GOOS
+)
 
 const logo = `
 ___  ____               _                 _____                  
@@ -55,14 +58,16 @@ type uiProgressWriter struct {
 
 func (myWriter uiProgressWriter) Write(data []byte) (int, error) {
 	myLen := len(data)
+
 	myWriter.ProgressBar.Incr()
 	_ = myWriter.ProgressBar.Set(myWriter.ProgressBar.Current() + myLen)
+
 	return myLen, nil
 }
 
 func deletFileNotInList(myFiles *[]os.FileInfo, myList *playList, syncPath *string, isNoConfirm *bool) {
 	linq.From(*myFiles).WhereT(func(myFile os.FileInfo) bool {
-		return !linq.From((*myList).Vector.Items).WhereT(func(myItem listItem) bool {
+		return !linq.From(myList.Vector.Items).WhereT(func(myItem listItem) bool {
 			return myItem.ID != ""
 		}).AnyWithT(func(myItem listItem) bool {
 			return hasID(*syncPath+myFile.Name(), myItem.ID)
@@ -73,6 +78,7 @@ func deletFileNotInList(myFiles *[]os.FileInfo, myList *playList, syncPath *stri
 
 			if err := keyboard.Open(); err != nil {
 				color.LightRed.Println(err)
+
 				return
 			}
 			defer keyboard.Close()
@@ -80,12 +86,14 @@ func deletFileNotInList(myFiles *[]os.FileInfo, myList *playList, syncPath *stri
 			char, _, err := keyboard.GetKey()
 			if err != nil {
 				color.LightRed.Println(err)
+
 				return
 			}
 
 			color.LightYellow.Print(string(char))
 
-			if char != 89 && char != 121 && char != 0 { // not in y Y space or enter
+			// not in y Y space or enter
+			if char != 89 && char != 121 && char != 0 {
 				return
 			}
 		}
@@ -99,7 +107,7 @@ func deletFileNotInList(myFiles *[]os.FileInfo, myList *playList, syncPath *stri
 }
 
 func convert(mp4FileName *string, mp3FileName *string, myID *string, myProgressBar *uiprogress.Bar) {
-	cmd := exec.Command(ffmpeg, "-y", "-i", *mp4FileName, "-vn", *mp3FileName)
+	cmd := exec.Command(ffmpeg, "-y", "-i", *mp4FileName, "-vn", *mp3FileName) //nolint:gosec
 
 	stderr, _ := cmd.StderrPipe()
 	_ = cmd.Start()
@@ -112,9 +120,10 @@ func convert(mp4FileName *string, mp3FileName *string, myID *string, myProgressB
 	for scanner.Scan() {
 		myText := scanner.Text()
 
-		if myText == "Duration:" {
+		switch {
+		case myText == "Duration:":
 			isDuration = true
-		} else if isDuration {
+		case isDuration:
 			isDuration = false
 
 			myDurations := strings.Split(strings.TrimRight(myText, ","), ":")
@@ -125,7 +134,7 @@ func convert(mp4FileName *string, mp3FileName *string, myID *string, myProgressB
 			myProgressBar.Total = int((h * 60 * 60) + (m * 60) + s)
 			_ = myProgressBar.Set(0)
 			myProgressBar.Incr()
-		} else if strings.HasPrefix(myText, "time=") {
+		case strings.HasPrefix(myText, "time="):
 			myDurations := strings.Split(strings.TrimLeft(myText, "time="), ":")
 			h, _ := strconv.ParseFloat(myDurations[0], 32)
 			m, _ := strconv.ParseFloat(myDurations[1], 32)
@@ -144,21 +153,41 @@ func convert(mp4FileName *string, mp3FileName *string, myID *string, myProgressB
 	_ = tag.Save()
 }
 
+func uiprogressFactory(myContentLength int, myTitle string, isDownloadStep *bool) *uiprogress.Bar {
+	return uiprogress.
+		AddBar(myContentLength).
+		AppendCompleted().PrependElapsed().
+		AppendFunc(func(myBar *uiprogress.Bar) string { return color.LightCyan.Render(myTitle) }).
+		PrependFunc(func(myBar *uiprogress.Bar) string {
+			if color.IsLikeInCmd() {
+				_, _ = color.Set(color.LightCyan)
+			}
+
+			if *isDownloadStep {
+				return color.LightMagenta.Render("Downloading")
+			}
+
+			return color.LightMagenta.Render("Converting ")
+		})
+}
+
 func download(myID string, myPath string, myClient youtube.Client, myWaitGroup *sync.WaitGroup) {
 	defer myWaitGroup.Done()
 
 	video, err := myClient.GetVideo(myID)
 	if err != nil {
 		color.LightRed.Println(err)
+
 		return
 	}
 
-	resp, err := myClient.GetStream(video, &video.Formats[0])
+	myResponse, err := myClient.GetStream(video, &video.Formats[0])
 	if err != nil {
 		color.LightRed.Println(err)
+
 		return
 	}
-	defer resp.Body.Close()
+	defer myResponse.Body.Close()
 
 	video.Title = strings.TrimSpace(regexp.MustCompile(`[<>:"\/\|?*]`).ReplaceAllString(video.Title, ""))
 
@@ -168,31 +197,19 @@ func download(myID string, myPath string, myClient youtube.Client, myWaitGroup *
 	file, err := os.Create(mp4FileName)
 	if err != nil {
 		color.LightRed.Println(err)
+
 		return
 	}
 
 	isDownloadStep := true
 
-	myProgressBar := uiprogress.
-		AddBar(int(resp.ContentLength)).
-		AppendCompleted().PrependElapsed().
-		AppendFunc(func(myBar *uiprogress.Bar) string { return color.LightCyan.Render(video.Title) }).
-		PrependFunc(func(myBar *uiprogress.Bar) string {
-			if color.IsLikeInCmd() {
-				_, _ = color.Set(color.LightCyan)
-			}
+	myProgressBar := uiprogressFactory(int(myResponse.ContentLength), video.Title, &isDownloadStep)
 
-			if isDownloadStep {
-				return color.LightMagenta.Render("Downloading")
-			}
-
-			return color.LightMagenta.Render("Converting ")
-		})
-
-	myReader := io.TeeReader(resp.Body, uiProgressWriter{ProgressBar: myProgressBar})
+	myReader := io.TeeReader(myResponse.Body, uiProgressWriter{ProgressBar: myProgressBar})
 
 	if _, err = io.Copy(file, myReader); err != nil {
 		color.LightRed.Println(err)
+
 		return
 	}
 
@@ -215,42 +232,53 @@ func getFiles(myPath string) *[]os.FileInfo {
 	files, err := ioutil.ReadDir(myPath)
 	if err != nil {
 		color.LightRed.Println(err)
+
 		return &[]os.FileInfo{}
 	}
 
 	return &files
 }
 
-func getPlayList(myID string) (myList *playList) {
-	myList = new(playList)
+func getPlayList(myID string) *playList {
+	myList := new(playList)
 
-	myRequest, err := http.NewRequest("GET", "https://www.mixerbox.com/api/0/com.mixerbox.www/0/en/getVector?type=playlist&vectorId="+myID, nil)
+	myURL := "https://www.mixerbox.com/api/0/com.mixerbox.www/0/en/getVector?type=playlist&vectorId=" + myID
+
+	myRequest, err := http.NewRequest(http.MethodGet, myURL, nil)
+	myRequest = myRequest.WithContext(context.Background())
+
 	if err != nil {
 		color.LightRed.Println(err)
-		return
+
+		return nil
 	}
+
 	myRequest.Header.Add("referer", "https://www.mixerbox.com/")
 
-	myClient := new(http.Client)
-	myResponse, err := myClient.Do(myRequest)
+	myResponse, err := http.DefaultClient.Do(myRequest)
 	if err != nil {
 		color.LightRed.Println(err)
-		return
+
+		return nil
 	}
 	defer myResponse.Body.Close()
 
 	myBody, err := ioutil.ReadAll(myResponse.Body)
 	if err != nil {
 		color.LightRed.Println(err)
-		return
-	}
-	err = json.Unmarshal(myBody, myList)
-	if err != nil {
-		color.LightRed.Println(err)
-		return
+
+		return nil
 	}
 
-	return
+	err = json.Unmarshal(myBody, myList)
+
+	if err != nil {
+		color.LightRed.Println(err)
+
+		return nil
+	}
+
+	return myList
 }
 
 func hasID(myFile string, myID string) bool {
@@ -278,12 +306,16 @@ func checkFFMpeg() bool {
 		color.LightRed.Println("FFMpeg Not Found!\n")
 		color.LightRed.Println("Please Visit https://ffmpeg.org/download.html For Install Instructions!\n")
 		color.LightBlue.Println("Or Download Link As Below")
+
 		switch runtimeGOOS {
 		case "windows":
-			color.LightBlue.Println("Windows 64bit https://ffmpeg.zeranoe.com/builds/win64/static/ffmpeg-4.3.1-win64-static-lgpl.zip")
-			color.LightBlue.Println("Windows 32bit https://ffmpeg.zeranoe.com/builds/win32/static/ffmpeg-4.3.1-win32-static-lgpl.zip")
+			color.LightBlue.Println(
+				"Windows 64bit https://ffmpeg.zeranoe.com/builds/win64/static/ffmpeg-4.3.1-win64-static-lgpl.zip")
+			color.LightBlue.Println(
+				"Windows 32bit https://ffmpeg.zeranoe.com/builds/win32/static/ffmpeg-4.3.1-win32-static-lgpl.zip")
 		case "darwin":
-			color.LightBlue.Println("MacOS 64bit https://ffmpeg.zeranoe.com/builds/macos64/static/ffmpeg-4.3.1-macos64-static-lgpl.zip")
+			color.LightBlue.Println(
+				"MacOS 64bit https://ffmpeg.zeranoe.com/builds/macos64/static/ffmpeg-4.3.1-macos64-static-lgpl.zip")
 		case "linux":
 			color.LightBlue.Println("Linux amd64 https://johnvansickle.com/ffmpeg/releases/ffmpeg-release-amd64-static.tar.xz")
 			color.LightBlue.Println("Linux i686  https://johnvansickle.com/ffmpeg/releases/ffmpeg-release-i686-static.tar.xz")
@@ -336,11 +368,13 @@ func main() {
 	if playListID == 0 || *isHelp {
 		printUsage()
 		os.Exit(0)
+
 		return
 	}
 
 	if !checkFFMpeg() {
 		os.Exit(0)
+
 		return
 	}
 
@@ -352,7 +386,7 @@ func main() {
 
 	uiprogress.Start()
 
-	linq.From((*myList).Vector.Items).WhereT(func(myItem listItem) bool {
+	linq.From(myList.Vector.Items).WhereT(func(myItem listItem) bool {
 		return myItem.ID != ""
 	}).ForEachT(func(myItem listItem) {
 		if linq.From(*myFiles).AnyWithT(func(myFile os.FileInfo) bool {
