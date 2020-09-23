@@ -4,7 +4,6 @@
 這是個命令列工具用來同步 MixerBox 上的歌單到本地資料夾
 
 ## 下載
----
 最新版的 MixerBoxSync 執行檔可在 Release 分頁下載
 
 有64位元 Windows, Mac OS X, Linux 版
@@ -12,7 +11,6 @@
 要使用本工具 你需要有 FFmpeg 在你的系統上 (參考 https://ffmpeg.org/download.html).
 
 ## 使用
----
 到 https://www.mixerbox.com/ 由網址取得 ID
 
 例如: https://www.mixerbox.com/list/10086761 ID 就是 10086761
@@ -33,7 +31,6 @@ MixerboxSync 10086761 -sy
 預設資料夾為歌單ID
 
 ## 從原始碼編譯
----
 要編譯 MixerboxSync 你需要在你的系統上安裝 GO v1.15 (參考 http://golang.org/dl/)
 
 在 原始碼 的資料夾  執行: 
@@ -43,12 +40,10 @@ go build
 ```
 
 ## 測試 覆蓋率
----
 在 原始碼 的資料夾  執行:
 ```shel
 go test -gcflags=-l -v -cover
 ```
 
 ## 授權
----
 本工具為 MIT 授權 細節參考 LICENSE
