@@ -1,3 +1,12 @@
+    ___  ____               _                 _____                  
+    |  \/  (_)             | |               /  ___|                 
+    | .  . |___  _____ _ __| |__   _____  __ \  --. _   _ _ __   ___ 
+    | |\/| | \ \/ / _ \ '__| '_ \ / _ \ \/ /   --. \ | | | '_ \ / __|
+    | |  | | |>  <  __/ |  | |_) | (_) >  <  /\__/ / |_| | | | | (__ 
+    \_|  |_/_/_/\_\___|_|  |_.__/ \___/_/\_\ \____/ \__, |_| |_|\___|
+                                                    __/ |           
+                                                    |___/            
+
 Synchronize MixerBox PlayList Songs To Locale Folder
 ==================
 
@@ -37,6 +46,8 @@ Flag y will delete file without confirm.
 Flag p can specify folder to sync. EX: -p=yourfolder
 
 Default folder is playlist ID
+
+![Screen](https://microchi.github.io/MixerboxSync/screen.gif)
 
 ## BUILDING FROM SOURCE
 To build MixerboxSync you will need Go v1.15 installed on your system (see http://golang.org/dl/).

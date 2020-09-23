@@ -1,4 +1,12 @@
-同步 MixerBox 上的歌單到本地資料夾
+    ___  ____               _                 _____                  
+    |  \/  (_)             | |               /  ___|                 
+    | .  . |___  _____ _ __| |__   _____  __ \  --. _   _ _ __   ___ 
+    | |\/| | \ \/ / _ \ '__| '_ \ / _ \ \/ /   --. \ | | | '_ \ / __|
+    | |  | | |>  <  __/ |  | |_) | (_) >  <  /\__/ / |_| | | | | (__ 
+    \_|  |_/_/_/\_\___|_|  |_.__/ \___/_/\_\ \____/ \__, |_| |_|\___|
+                                                    __/ |           
+                                                    |___/   
+同步 MixerBox 歌單上的歌曲到本地資料夾
 ==================
 
 [![LICENSE MIT](https://img.shields.io/github/license/microchi/MixboxSync)](https://raw.githubusercontent.com/microchi/MixboxSync/master/LICENSE)
@@ -6,7 +14,7 @@
 [![codecov](https://codecov.io/gh/microchi/MixerboxSync/branch/master/graph/badge.svg)](https://codecov.io/gh/microchi/MixerboxSync)
 [![Go Report Card](https://goreportcard.com/badge/github.com/microchi/MixerboxSync)](https://goreportcard.com/report/github.com/microchi/MixerboxSync)
 
-這是個命令列工具用來同步 MixerBox 上的歌單到本地資料夾
+這是個命令列工具用來同步 MixerBox 歌單上的歌曲到本地資料夾
 
 ## 下載
 最新版的 MixerBoxSync 執行檔可在 Release 分頁下載
@@ -34,6 +42,8 @@ MixerboxSync 10086761 -sy
 標籤 p 可指定同步資料夾 例如: -p=yourfolder
 
 預設資料夾為歌單ID
+
+![Screen](https://microchi.github.io/MixerboxSync/screen.gif)
 
 ## 從原始碼編譯
 要編譯 MixerboxSync 你需要在你的系統上安裝 GO v1.15 (參考 http://golang.org/dl/)
