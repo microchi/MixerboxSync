@@ -1,6 +1,11 @@
 同步 MixerBox 上的歌單到本地資料夾
 ==================
 
+[![LICENSE MIT](https://img.shields.io/github/license/microchi/MixboxSync)](https://raw.githubusercontent.com/microchi/MixboxSync/master/LICENSE)
+[![BUILD](https://github.com/microchi/MixerboxSync/workflows/Go/badge.svg?branch=master)](https://github.com/microchi/MixerboxSync/actions)
+[![codecov](https://codecov.io/gh/microchi/MixerboxSync/branch/master/graph/badge.svg)](https://codecov.io/gh/microchi/MixerboxSync)
+[![Go Report Card](https://goreportcard.com/badge/github.com/microchi/MixerboxSync)](https://goreportcard.com/report/github.com/microchi/MixerboxSync)
+
 這是個命令列工具用來同步 MixerBox 上的歌單到本地資料夾
 
 ## 下載

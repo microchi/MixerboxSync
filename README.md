@@ -1,6 +1,11 @@
 Synchronize MixerBox PlayList Songs To Locale Folder
 ==================
 
+[![LICENSE MIT](https://img.shields.io/github/license/microchi/MixboxSync)](https://raw.githubusercontent.com/microchi/MixboxSync/master/LICENSE)
+[![BUILD](https://github.com/microchi/MixerboxSync/workflows/Go/badge.svg?branch=master)](https://github.com/microchi/MixerboxSync/actions)
+[![codecov](https://codecov.io/gh/microchi/MixerboxSync/branch/master/graph/badge.svg)](https://codecov.io/gh/microchi/MixerboxSync)
+[![Go Report Card](https://goreportcard.com/badge/github.com/microchi/MixerboxSync)](https://goreportcard.com/report/github.com/microchi/MixerboxSync)
+
 >**[中文說明](README.zh.md)**
 
 This is a command line Tool for synchronizing MixerBox playlist songs to locale folder.
