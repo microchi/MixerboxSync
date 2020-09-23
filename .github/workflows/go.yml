@@ -18,4 +18,4 @@ jobs:
     - if: steps.cache.outputs.cache-hit != 'true'
       run: go mod download
     - run: go build -v
-    - run: go -gcflags=-l -v -cover
+    - run: go test -gcflags=-l -v -cover
