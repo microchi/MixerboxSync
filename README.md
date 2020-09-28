@@ -20,7 +20,7 @@ Synchronize MixerBox PlayList Songs To Locale Folder
 This is a command line Tool for synchronizing MixerBox playlist songs to locale folder.
 
 ## DOWNLOADS
-The latest versions of MixerBoxSync executables are available for download at Release tab
+The latest versions of MixerBoxSync executables are available for download at [Release](https://github.com/microchi/MixerboxSync/releases) tab
 
 64-bit builds are provided for Windows, Mac OS X, Linux.
 

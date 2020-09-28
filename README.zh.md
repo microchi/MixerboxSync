@@ -17,7 +17,7 @@
 這是個命令列工具用來同步 MixerBox 歌單上的歌曲到本地資料夾
 
 ## 下載
-最新版的 MixerBoxSync 執行檔可在 Release 分頁下載
+最新版的 MixerBoxSync 執行檔可在 [Release](https://github.com/microchi/MixerboxSync/releases) 分頁下載
 
 有64位元 Windows, Mac OS X, Linux 版
 
