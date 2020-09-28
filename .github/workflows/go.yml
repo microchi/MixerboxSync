@@ -63,7 +63,8 @@ jobs:
     needs: [lint, build, test]
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/create-release@v1.1.4
+      - id: create_release
+        uses: actions/create-release@v1.1.4
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
