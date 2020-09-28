@@ -24,8 +24,23 @@ jobs:
     - if: steps.cache.outputs.cache-hit != 'true'
       run: go mod download
     - run: CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -o MixerboxSync -v
+    - uses: montudor/action-zip@v0.1.0
+      with:
+        args: zip -9 MixerboxSync_Linux_x64.zip MixerboxSync
     - run: CGO_ENABLED=0 GOOS=windows GOARCH=amd64 go build -o MixerboxSync.exe -v
+    - uses: montudor/action-zip@v0.1.0
+      with:
+        args: zip -9 MixerboxSync_Windows_x64.zip MixerboxSync.exe      
     - run: CGO_ENABLED=0 GOOS=darwin GOARCH=amd64 go build -o MixerboxSync -v
+    - uses: montudor/action-zip@v0.1.0
+      with:
+        args: zip -9 MixerboxSync_MacOS_x64.zip MixerboxSync      
+    - uses: actions/upload-artifact@v2
+      with:
+        path: |
+          MixerboxSync_Linux_x64.zip
+          MixerboxSync_Windows_x64.zip
+          MixerboxSync_MacOS_x64.zip
       
   test:    
     runs-on: ubuntu-latest
